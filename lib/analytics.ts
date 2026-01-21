@@ -36,7 +36,7 @@ export async function trackClick({
         utmSource = refUrl.searchParams.get('utm_source')
         utmMedium = refUrl.searchParams.get('utm_medium')
         utmCampaign = refUrl.searchParams.get('utm_campaign')
-      } catch (e) {
+      } catch (_e) {
       }
     }
 
