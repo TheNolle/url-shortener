@@ -1,0 +1,52 @@
+name: Documentation
+description: Report missing or incorrect documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve our documentation!
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Documentation Type
+      options:
+        - README
+        - API Documentation
+        - Setup Guide
+        - Configuration
+        - Code Comments
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What's Wrong?
+      description: Describe the documentation issue
+      placeholder: The section about Docker setup is missing...
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: Where is the documentation located?
+      placeholder: README.md, line 42 or /docs/api.md
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: How should we improve it?
+      placeholder: Add a section explaining...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context or examples
