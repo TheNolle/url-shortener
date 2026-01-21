@@ -14,8 +14,8 @@ interface RouteContext {
   params: Promise<{ code: string }>
 }
 
-export default async function Image({ params }: RouteContext) {
-  const { code } = await params
+export async function GET(_request: Request, context: RouteContext) {
+  const { code } = await context.params
 
   const url = await getUrlByShortCode(code)
 
@@ -37,7 +37,9 @@ export default async function Image({ params }: RouteContext) {
           <div style={{ fontSize: 60, fontWeight: 'bold' }}>URL Not Found</div>
         </div>
       ),
-      size
+      {
+        ...size,
+      }
     )
   }
 
@@ -149,6 +151,8 @@ export default async function Image({ params }: RouteContext) {
         </div>
       </div>
     ),
-    size
+    {
+      ...size,
+    }
   )
 }
