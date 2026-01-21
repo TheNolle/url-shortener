@@ -1,0 +1,31 @@
+'documentation':
+  - '**/*.md'
+  - '.github/**'
+
+'dependencies':
+  - 'package.json'
+  - 'package-lock.json'
+
+'docker':
+  - 'Dockerfile*'
+  - 'docker-compose*.yml'
+  - '.dockerignore'
+
+'database':
+  - 'prisma/**'
+  - 'lib/database/**'
+
+'security':
+  - 'lib/security.ts'
+  - 'lib/shortener.ts'
+
+'api':
+  - 'app/api/**'
+
+'ui':
+  - 'components/**'
+  - 'app/**/*.tsx'
+
+'infrastructure':
+  - '.github/workflows/**'
+  - 'scripts/**'
