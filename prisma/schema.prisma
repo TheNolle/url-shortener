@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/database/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// URL
+model Url {
+  id          String    @id @default(cuid())
+  originalUrl String
+  urlHash     String    @unique
+  shortCode   String    @unique
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  isFlagged   Boolean   @default(false)
+  flagReason  String?
+
+  isPasswordProtected Boolean @default(false)
+  passwordHash        String?
+
+  isRotation      Boolean @default(false)
+  rotationType    String?
+  currentRotation Int     @default(0)
+
+  lastHealthCheck  DateTime?
+  healthStatus     HealthStatus @default(UNKNOWN)
+  lastStatusCode   Int?
+  healthCheckError String?
+
+  userUrls      UserUrl[]
+  analytics     Analytics[]
+  reports       Report[]
+  scans         UrlScan[]
+  clickEvents   ClickEvent[]
+  metadata      LinkMetadata?
+  rotationLinks RotationLink[]
+  healthChecks  HealthCheck[]
+
+  @@index([shortCode])
+  @@index([urlHash])
+  @@index([expiresAt])
+  @@index([healthStatus])
+}
+
+enum HealthStatus {
+  HEALTHY
+  WARNING
+  BROKEN
+  UNKNOWN
+}
+
+// LINK METADATA
+model LinkMetadata {
+  id          String    @id @default(cuid())
+  urlId       String    @unique
+  title       String?
+  description String?
+  image       String?
+  logo        String?
+  author      String?
+  publisher   String?
+  date        DateTime?
+  favicon     String?
+  scrapedAt   DateTime  @default(now())
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+}
+
+// ROTATION LINKS
+model RotationLink {
+  id          String   @id @default(cuid())
+  urlId       String
+  destination String
+  weight      Int      @default(1)
+  label       String?
+  clicks      Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+}
+
+// HEALTH CHECKS
+model HealthCheck {
+  id           String       @id @default(cuid())
+  urlId        String
+  checkedAt    DateTime     @default(now())
+  statusCode   Int?
+  responseTime Int?
+  status       HealthStatus
+  errorMessage String?
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+  @@index([checkedAt])
+}
+
+// USER URL RELATIONSHIP
+model UserUrl {
+  id        String   @id @default(cuid())
+  userId    String
+  urlId     String
+  createdAt DateTime @default(now())
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, urlId])
+  @@index([userId])
+}
+
+// ANALYTICS
+model Analytics {
+  id        String    @id @default(cuid())
+  urlId     String    @unique
+  clicks    Int       @default(0)
+  lastClick DateTime?
+  ipHash    String?
+  userAgent String?
+  referer   String?
+  country   String?
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+}
+
+model ClickEvent {
+  id        String   @id @default(cuid())
+  urlId     String
+  clickedAt DateTime @default(now())
+  ipHash    String?
+  userAgent String?
+  referer   String?
+  country   String?
+  city      String?
+  device    String?
+  browser   String?
+  os        String?
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+  @@index([clickedAt])
+}
+
+// REPORTS
+model Report {
+  id         String       @id @default(cuid())
+  urlId      String
+  reportedBy String?
+  reason     String
+  createdAt  DateTime     @default(now())
+  status     ReportStatus @default(PENDING)
+  reviewedBy String?
+  reviewedAt DateTime?
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+  @@index([status])
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  DISMISSED
+}
+
+// URL SCANS
+model UrlScan {
+  id        String   @id @default(cuid())
+  urlId     String
+  service   String
+  result    String
+  details   Json?
+  scannedAt DateTime @default(now())
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+}
+
+// RATE LIMITING
+model RateLimit {
+  id         String   @id @default(cuid())
+  identifier String   @unique
+  tokens     Int      @default(10)
+  lastRefill DateTime @default(now())
+
+  @@index([identifier])
+}
+
+// BANNED IPS
+model BannedIp {
+  id       String   @id @default(cuid())
+  ip       String   @unique
+  reason   String?
+  bannedAt DateTime @default(now())
+  bannedBy String
+
+  @@index([ip])
+}
+
+// BANNED DOMAINS
+model BannedDomain {
+  id       String   @id @default(cuid())
+  domain   String   @unique
+  reason   String?
+  bannedAt DateTime @default(now())
+  bannedBy String
+
+  @@index([domain])
+}
+
+// ADMIN CONFIGURATIONS
+model AdminConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+
+  @@index([key])
+}
+
+// API KEYS
+model ApiKey {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  key       String    @unique
+  keyPrefix String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  lastUsed  DateTime?
+  expiresAt DateTime?
+
+  requestCount Int @default(0)
+  rateLimit    Int @default(1000)
+
+  bypassSecurity  Boolean @default(false)
+  bypassRateLimit Boolean @default(false)
+
+  @@index([userId])
+  @@index([key])
+}
+
+model ApiKeyUsage {
+  id        String   @id @default(cuid())
+  apiKeyId  String
+  endpoint  String
+  method    String
+  status    Int
+  timestamp DateTime @default(now())
+  ipAddress String?
+
+  @@index([apiKeyId])
+  @@index([timestamp])
+}
