@@ -3,6 +3,9 @@ import { StatsCards } from '@/components/admin/stats-cards'
 import { ReportQueue } from '@/components/admin/report-queue'
 import prisma from '@/lib/database'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default async function AdminDashboardPage() {
   const stats = await getAdminStats()
 

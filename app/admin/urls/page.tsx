@@ -4,6 +4,9 @@ import { isAdmin } from '@/lib/utils'
 import { AdminUrlManager } from '@/components/admin/admin-url-manager'
 import prisma from '@/lib/database'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default async function AdminUrlsPage() {
   const { userId } = await auth()
 

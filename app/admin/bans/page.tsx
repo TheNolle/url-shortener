@@ -1,6 +1,9 @@
 import { BanManager } from '@/components/admin/ban-manager'
 import prisma from '@/lib/database'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default async function AdminBansPage() {
   const [bannedIps, bannedDomains] = await Promise.all([
     prisma.bannedIp.findMany({ orderBy: { bannedAt: 'desc' } }),

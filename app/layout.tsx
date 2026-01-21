@@ -9,11 +9,13 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 
 export const metadata: Metadata = {
   title: 'S',
-  description: 'A link shortener with a focus on privacy and simplicity.',
+  description: 'A production-ready URL shortener with advanced security, analytics, A/B testing, and health monitoring. Built with Next.js 16, PostgreSQL, Redis, and Docker.',
   icons: {
     icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%221em%22 font-size=%2280%22>🔗</text></svg>',
   }
 }
+
+export const dynamic = 'force-dynamic'
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

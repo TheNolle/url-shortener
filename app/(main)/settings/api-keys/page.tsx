@@ -2,6 +2,9 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { ApiKeysManager } from '@/components/api-keys-manager'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default async function ApiKeysPage() {
   const { userId } = await auth()
 

@@ -1,6 +1,9 @@
 import { ReportQueue } from '@/components/admin/report-queue'
 import prisma from '@/lib/database'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default async function AdminReportsPage() {
   const allReports = await prisma.report.findMany({
     where: { status: 'PENDING' },
