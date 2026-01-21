@@ -4,12 +4,6 @@ import { headers } from 'next/headers'
 import prisma from '@/lib/database'
 import { invalidateCache } from '@/lib/cache'
 
-const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
-
-if (!webhookSecret) {
-  throw new Error('Please add CLERK_WEBHOOK_SECRET to .env')
-}
-
 type ClerkWebhookEvent = {
   type: string
   data: {
@@ -24,6 +18,23 @@ type ClerkWebhookEvent = {
 }
 
 export async function POST(req: NextRequest) {
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET
+
+  if (!WEBHOOK_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('CLERK_WEBHOOK_SECRET is required in production')
+      return NextResponse.json(
+        { error: 'Webhook secret not configured' },
+        { status: 500 }
+      )
+    }
+    console.warn('CLERK_WEBHOOK_SECRET not set - webhook endpoint will not work')
+    return NextResponse.json(
+      { error: 'Webhook not configured' },
+      { status: 503 }
+    )
+  }
+
   try {
     const headerPayload = await headers()
     const svixId = headerPayload.get('svix-id')
@@ -40,7 +51,7 @@ export async function POST(req: NextRequest) {
     const payload = await req.json()
     const body = JSON.stringify(payload)
 
-    const wh = new Webhook(webhookSecret!)
+    const wh = new Webhook(WEBHOOK_SECRET)
 
     let evt: ClerkWebhookEvent
 
