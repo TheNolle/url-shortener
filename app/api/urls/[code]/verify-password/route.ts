@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const body = await request.json()
     const { password } = body
 
-    if (!password) {
+    if (!password || typeof password !== 'string' || password.trim().length === 0) {
       return NextResponse.json({ error: 'Password required' }, { status: 400 })
     }
 

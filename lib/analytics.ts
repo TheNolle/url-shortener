@@ -1,7 +1,5 @@
 import prisma from './database'
-import { hashIp } from './utils'
 import { AnalyticsData, AdminStats } from '@/types'
-import { UAParser } from 'ua-parser-js'
 
 export interface TrackClickOptions {
   shortCode: string
