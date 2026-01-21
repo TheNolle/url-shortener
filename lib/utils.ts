@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import crypto from 'crypto'
+import { createHash } from 'crypto'
 import bcrypt from 'bcryptjs'
 
 export function cn(...inputs: ClassValue[]) {
@@ -8,11 +8,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function hashUrl(url: string): string {
-  return crypto.createHash('sha256').update(url).digest('hex')
+  return createHash('sha256').update(url).digest('hex')
 }
 
 export function hashIp(ip: string): string {
-  return crypto.createHash('sha256').update(ip + String(process.env.IP_SALT)).digest('hex')
+  if (typeof window !== 'undefined') {
+    return btoa(ip).substring(0, 32)
+  }
+  return createHash('sha256').update(ip).digest('hex')
 }
 
 export async function hashPassword(password: string): Promise<string> {

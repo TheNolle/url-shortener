@@ -1,138 +1,282 @@
-import metascraper from 'metascraper'
-import metascraperAuthor from 'metascraper-author'
-import metascraperDate from 'metascraper-date'
-import metascraperDescription from 'metascraper-description'
-import metascraperImage from 'metascraper-image'
-import metascraperLogo from 'metascraper-logo'
-import metascraperPublisher from 'metascraper-publisher'
-import metascraperTitle from 'metascraper-title'
-import metascraperUrl from 'metascraper-url'
+import { load } from 'cheerio'
+import { Readability } from '@mozilla/readability'
+import { parseHTML } from 'linkedom'
 import prisma from './database'
 
-const scraper = metascraper([
-  metascraperAuthor(),
-  metascraperDate(),
-  metascraperDescription(),
-  metascraperImage(),
-  metascraperLogo(),
-  metascraperPublisher(),
-  metascraperTitle(),
-  metascraperUrl(),
-])
-
-export interface MetadataResult {
-  title?: string
-  description?: string
-  image?: string
-  logo?: string
-  author?: string
-  publisher?: string
-  date?: string
-  url?: string
-  favicon?: string
-}
-
-export async function scrapeMetadata(url: string): Promise<MetadataResult | null> {
+export async function scrapeAndSaveMetadata(urlId: string, targetUrl: string) {
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    const metadata = await scrapeMetadata(targetUrl)
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; URLShortenerBot/1.0)',
+    await prisma.linkMetadata.upsert({
+      where: { urlId },
+      create: {
+        urlId,
+        title: metadata.title,
+        description: metadata.description,
+        image: metadata.image,
+        favicon: metadata.favicon,
+        author: metadata.article?.author || null,
+        publisher: metadata.article?.siteName || null,
+        date: null,
+        logo: metadata.favicon,
+        scrapedAt: new Date()
       },
-      signal: controller.signal,
+      update: {
+        title: metadata.title,
+        description: metadata.description,
+        image: metadata.image,
+        favicon: metadata.favicon,
+        author: metadata.article?.author || null,
+        publisher: metadata.article?.siteName || null,
+        logo: metadata.favicon,
+        scrapedAt: new Date()
+      }
     })
 
-    clearTimeout(timeoutId)
+    return {
+      success: true,
+      metadata: {
+        title: metadata.title,
+        description: metadata.description,
+        image: metadata.image,
+        favicon: metadata.favicon
+      }
+    }
+  } catch (error) {
+    console.error('Failed to scrape and save metadata:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function scrapeMetadata(url: string) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      },
+      signal: AbortSignal.timeout(10000)
+    })
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
     }
 
     const html = await response.text()
-    const metadata = await scraper({ html, url })
+    const $ = load(html)
+    const articleContent = extractArticleContent(url, html)
 
-    const faviconMatch = html.match(/<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*href=["']([^"']+)["']/i)
-    const favicon = faviconMatch ? new URL(faviconMatch[1], url).href : `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`
+    const metadata = {
+      title: extractTitle($, articleContent),
+      description: extractDescription($, articleContent),
+      image: extractImage($),
+      favicon: extractFavicon($, url),
 
-    return {
-      title: metadata.title || undefined,
-      description: metadata.description || undefined,
-      image: metadata.image || undefined,
-      logo: metadata.logo || undefined,
-      author: metadata.author || undefined,
-      publisher: metadata.publisher || undefined,
-      date: metadata.date || undefined,
-      url: metadata.url || url,
-      favicon,
+      article: articleContent ? {
+        content: articleContent.content,
+        textContent: articleContent.textContent,
+        excerpt: articleContent.excerpt,
+        author: articleContent.byline,
+        length: articleContent.length,
+        siteName: articleContent.siteName
+      } : null,
+
+      openGraph: extractOpenGraph($),
+      twitterCard: extractTwitterCard($),
+      canonical: $('link[rel="canonical"]').attr('href') || url,
+      language: $('html').attr('lang') || articleContent?.lang || 'en',
+      keywords: $('meta[name="keywords"]').attr('content')?.split(',').map(k => k.trim()) || []
     }
+
+    return metadata
+
   } catch (error) {
-    console.error('Metadata scraping error:', error)
-    return null
+    console.error('Metadata scraping failed:', error)
+    return {
+      title: 'Unknown',
+      description: '',
+      image: null,
+      favicon: null,
+      article: null,
+      openGraph: {},
+      twitterCard: {},
+      canonical: url,
+      language: 'en',
+      keywords: []
+    }
   }
 }
 
-export async function saveMetadata(urlId: string, metadata: MetadataResult): Promise<void> {
-  try {
-    await prisma.linkMetadata.upsert({
-      where: { urlId },
-      update: {
-        title: metadata.title,
-        description: metadata.description,
-        image: metadata.image,
-        logo: metadata.logo,
-        author: metadata.author,
-        publisher: metadata.publisher,
-        date: metadata.date ? new Date(metadata.date) : null,
-        favicon: metadata.favicon,
-        scrapedAt: new Date(),
-      },
-      create: {
-        urlId,
-        title: metadata.title,
-        description: metadata.description,
-        image: metadata.image,
-        logo: metadata.logo,
-        author: metadata.author,
-        publisher: metadata.publisher,
-        date: metadata.date ? new Date(metadata.date) : null,
-        favicon: metadata.favicon,
-      },
-    })
-  } catch (error) {
-    console.error('Save metadata error:', error)
-  }
-}
-
-export async function getMetadata(urlId: string): Promise<MetadataResult | null> {
+export async function getMetadata(urlId: string) {
   try {
     const metadata = await prisma.linkMetadata.findUnique({
-      where: { urlId },
+      where: { urlId }
     })
-
-    if (!metadata) return null
-
-    return {
-      title: metadata.title || undefined,
-      description: metadata.description || undefined,
-      image: metadata.image || undefined,
-      logo: metadata.logo || undefined,
-      author: metadata.author || undefined,
-      publisher: metadata.publisher || undefined,
-      date: metadata.date?.toISOString(),
-      favicon: metadata.favicon || undefined,
-    }
+    return metadata
   } catch (error) {
-    console.error('Get metadata error:', error)
+    console.error('Failed to get metadata:', error)
     return null
   }
 }
 
-export async function scrapeAndSaveMetadata(urlId: string, url: string): Promise<MetadataResult | null> {
-  const metadata = await scrapeMetadata(url)
-  if (metadata) {
-    await saveMetadata(urlId, metadata)
+export async function refreshMetadata(urlId: string, targetUrl: string) {
+  try {
+    await prisma.linkMetadata.delete({
+      where: { urlId }
+    }).catch(() => { })
+
+    return await scrapeAndSaveMetadata(urlId, targetUrl)
+  } catch (error) {
+    console.error('Failed to refresh metadata:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
-  return metadata
+}
+
+export async function batchScrapeMetadata(urls: { urlId: string; targetUrl: string }[]) {
+  const results = await Promise.allSettled(
+    urls.map(({ urlId, targetUrl }) => scrapeAndSaveMetadata(urlId, targetUrl))
+  )
+
+  return results.map((result, index) => ({
+    urlId: urls[index].urlId,
+    success: result.status === 'fulfilled' ? result.value.success : false,
+    error: result.status === 'rejected' ? result.reason : undefined
+  }))
+}
+
+function extractArticleContent(url: string, html: string) {
+  try {
+    const { document } = parseHTML(html)
+
+    const unwantedSelectors = [
+      'script', 'style', 'noscript', 'iframe',
+      'footer', 'header', 'nav', 'aside',
+      '.advertisement', '.sidebar', '.menu',
+      '.cookie-banner', '.popup', '.modal'
+    ]
+
+    unwantedSelectors.forEach(selector => {
+      document.querySelectorAll(selector).forEach((el: any) => el.remove())
+    })
+
+    const reader = new Readability(document, {
+      charThreshold: 100,
+      keepClasses: false
+    })
+
+    const article = reader.parse()
+
+    if (!article) return null
+
+    return {
+      title: article.title || '',
+      content: article.content || '',
+      textContent: article.textContent || '',
+      excerpt: article.excerpt || '',
+      byline: article.byline || '',
+      length: article.length || 0,
+      siteName: article.siteName || '',
+      lang: article.lang || ''
+    }
+  } catch (error) {
+    console.error('Readability extraction failed:', error)
+    return null
+  }
+}
+
+function extractTitle($: any, articleContent: any) {
+  return (
+    $('meta[property="og:title"]').attr('content') ||
+    $('meta[name="twitter:title"]').attr('content') ||
+    articleContent?.title ||
+    $('title').text() ||
+    $('h1').first().text() ||
+    'No title'
+  ).trim()
+}
+
+function extractDescription($: any, articleContent: any) {
+  return (
+    $('meta[property="og:description"]').attr('content') ||
+    $('meta[name="twitter:description"]').attr('content') ||
+    $('meta[name="description"]').attr('content') ||
+    articleContent?.excerpt ||
+    $('p').first().text().substring(0, 200) ||
+    ''
+  ).trim()
+}
+
+function extractImage($: any) {
+  return (
+    $('meta[property="og:image"]').attr('content') ||
+    $('meta[property="og:image:url"]').attr('content') ||
+    $('meta[name="twitter:image"]').attr('content') ||
+    $('meta[itemprop="image"]').attr('content') ||
+    $('img').first().attr('src') ||
+    null
+  )
+}
+
+function extractFavicon($: any, baseUrl: string) {
+  const favicon = (
+    $('link[rel="icon"]').attr('href') ||
+    $('link[rel="shortcut icon"]').attr('href') ||
+    $('link[rel="apple-touch-icon"]').attr('href') ||
+    '/favicon.ico'
+  )
+
+  if (!favicon) return null
+
+  try {
+    return new URL(favicon, baseUrl).href
+  } catch {
+    return favicon
+  }
+}
+
+function extractOpenGraph($: any) {
+  const ogData: Record<string, string> = {}
+
+  $('meta[property^="og:"]').each((_: any, element: any) => {
+    const property = $(element).attr('property')
+    const content = $(element).attr('content')
+
+    if (property && content) {
+      const key = property.replace('og:', '')
+      ogData[key] = content.trim()
+    }
+  })
+
+  return ogData
+}
+
+function extractTwitterCard($: any) {
+  const twitterData: Record<string, string> = {}
+
+  $('meta[name^="twitter:"]').each((_: any, element: any) => {
+    const name = $(element).attr('name')
+    const content = $(element).attr('content')
+
+    if (name && content) {
+      const key = name.replace('twitter:', '')
+      twitterData[key] = content.trim()
+    }
+  })
+
+  return twitterData
+}
+
+export async function scrapeBasicMetadata(url: string) {
+  const metadata = await scrapeMetadata(url)
+  return {
+    title: metadata.title,
+    description: metadata.description,
+    image: metadata.image,
+    favicon: metadata.favicon
+  }
 }

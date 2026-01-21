@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og'
 import { getUrlByShortCode } from '@/lib/shortener'
 import prisma from '@/lib/database'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 export const alt = 'URL Preview'
 export const size = {
   width: 1200,

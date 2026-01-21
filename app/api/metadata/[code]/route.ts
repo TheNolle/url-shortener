@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/database'
 import { scrapeAndSaveMetadata } from '@/lib/metadata-scraper'
 
+export const runtime = 'nodejs'
+
 interface RouteContext {
   params: Promise<{ code: string }>
 }
