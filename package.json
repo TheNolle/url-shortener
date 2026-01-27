@@ -31,7 +31,7 @@
     "metascraper-publisher": "^5.49.15",
     "metascraper-url": "^5.49.15",
     "nanoid": "^5.1.6",
-    "next": "16.1.4",
+    "next": "16.1.6",
     "node-cron": "^4.2.1",
     "pg": "^8.17.1",
     "qrcode": "^1.5.4",
